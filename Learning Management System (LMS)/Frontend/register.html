@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-graduation-cap"></i> LMS <span>Academy</span>
+        </div>
+        <ul>
+            <!-- Populated dynamically by script.js -->
+        </ul>
+    </nav>
+</header>
+
+<div class="container">
+    <div class="form-container">
+        <h2>Student Registration</h2>
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="student_id">Student ID (Number)</label>
+                <input type="number" id="student_id" placeholder="e.g. 101" required>
+            </div>
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" placeholder="e.g. Rahul Sharma" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="e.g. rahul@gmail.com" required>
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="text" id="phone" placeholder="e.g. 9876543210" required>
+            </div>
+            <div class="form-group">
+                <label for="qualification">Highest Qualification</label>
+                <input type="text" id="qualification" placeholder="e.g. B.Tech / MBA" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit"><i class="fa-solid fa-user-plus"></i> Register Account</button>
+        </form>
+        <p>Already have an account? <a href="login.html">Login here</a></p>
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 Learning Management System. All Rights Reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    document.getElementById("registerForm").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        
+        const student = {
+            student_id: parseInt(document.getElementById("student_id").value),
+            full_name: document.getElementById("name").value.trim(),
+            email: document.getElementById("email").value.trim(),
+            phone: document.getElementById("phone").value.trim(),
+            qualification: document.getElementById("qualification").value.trim(),
+            password: document.getElementById("password").value
+        };
+
+        try {
+            const response = await apiCall("/students/add/", "POST", student);
+            alert("Registration Successful! Please login.");
+            window.location.href = "login.html";
+        } catch (error) {
+            alert("Registration failed: " + error.message);
+        }
+    });
+</script>
+</body>
+</html>

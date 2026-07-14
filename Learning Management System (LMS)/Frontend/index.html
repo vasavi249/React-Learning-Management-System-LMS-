@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learning Management System</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-graduation-cap"></i> LMS <span>Academy</span>
+        </div>
+        <ul>
+            <!-- Populated dynamically by script.js -->
+        </ul>
+    </nav>
+</header>
+
+<section class="hero">
+    <div class="hero-text">
+        <h1>Shape Your Future With Professional Learning</h1>
+        <p>
+            Learn from industry specialists, complete assignments, verify progress, and earn certificates.
+        </p>
+        <a href="courses.html">
+            <button><i class="fa-regular fa-compass"></i> Explore All Courses</button>
+        </a>
+    </div>
+</section>
+
+<section class="courses">
+    <h2>Featured Courses</h2>
+    <div class="course-container" id="featuredCoursesContainer">
+        <!-- Loaded dynamically from api -->
+        <div style="width:100%; text-align:center; padding: 20px; color: var(--text-muted);">
+            <i class="fa-solid fa-spinner fa-spin fa-2xl"></i> <p style="margin-top: 10px;">Loading courses...</p>
+        </div>
+    </div>
+</section>
+
+<section class="about">
+    <h2>About LMS Academy</h2>
+    <p>
+        LMS Academy is a modern, end-to-end Learning Management System designed to empower educational instructors to share their specialization and guide students through organized modules, assignments, and certified outcomes.
+    </p>
+</section>
+
+<footer>
+    <p>© 2026 Learning Management System. All Rights Reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", async () => {
+        const container = document.getElementById("featuredCoursesContainer");
+        try {
+            const coursesList = await apiCall("/courses/");
+            container.innerHTML = "";
+            
+            if (coursesList.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: var(--text-muted); width: 100%;">
+                        <p>No courses found in database. Seed data in Admin Panel or register courses to see them here.</p>
+                        <br>
+                        <a href="admin.html"><button class="btn-secondary">Go to Admin Panel</button></a>
+                    </div>`;
+                return;
+            }
+            
+            // Display first 3 courses
+            const featured = coursesList.slice(0, 3);
+            featured.forEach(course => {
+                const card = document.createElement("div");
+                card.className = "course-card";
+                
+                let badgeClass = "badge-beginner";
+                if (course.level === "Intermediate") badgeClass = "badge-intermediate";
+                else if (course.level === "Advanced") badgeClass = "badge-advanced";
+                
+                card.innerHTML = `
+                    <div class="course-card-body">
+                        <span class="course-badge ${badgeClass}">${course.level}</span>
+                        <h2>${course.course_name}</h2>
+                        <div class="course-info"><i class="fa fa-user-tie"></i> <b>Instructor:</b> ${course.instructor_name}</div>
+                        <div class="course-info"><i class="fa-regular fa-clock"></i> <b>Duration:</b> ${course.duration}</div>
+                        <div class="course-info"><i class="fa-solid fa-layer-group"></i> <b>Category:</b> ${course.category}</div>
+                        <div class="course-price">₹${course.price.toLocaleString()}</div>
+                        <button onclick="enrollInCourse('${course.course_name.replace(/'/g, "\\'")}')"><i class="fa-solid fa-plus"></i> Enroll Now</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } catch (err) {
+            console.error("Error fetching courses", err);
+            container.innerHTML = `
+                <div style="text-align: center; color: var(--danger); width: 100%;">
+                    <p><i class="fa-solid fa-circle-exclamation fa-xl"></i> Error loading courses from API. Is backend running?</p>
+                </div>`;
+        }
+    });
+
+    async function enrollInCourse(courseName) {
+        const user = getLoggedInUser();
+        if (!user) {
+            alert("Please login first to enroll in courses!");
+            window.location.href = "login.html";
+            return;
+        }
+        
+        try {
+            // Check if already enrolled in this course
+            const enrollments = await apiCall("/enrollments/");
+            const alreadyEnrolled = enrollments.some(e => e.student_name === user.full_name && e.course_name === courseName);
+            if (alreadyEnrolled) {
+                alert(`You are already enrolled in "${courseName}"! Check My Enrollments.`);
+                window.location.href = "enrollments.html";
+                return;
+            }
+            
+            // Create enrollment
+            const enrollId = 400 + Math.floor(Math.random() * 10000); // Random ID for enrollment
+            const dateToday = new Date().toISOString().split('T')[0];
+            const newEnrollment = {
+                enrollment_id: enrollId,
+                student_name: user.full_name,
+                course_name: courseName,
+                enrollment_date: dateToday,
+                payment_status: "Paid", // Automatically Paid for simplicity
+                course_status: "Active"
+            };
+            
+            await apiCall("/enrollments/add/", "POST", newEnrollment);
+            alert(`Enrolled in "${courseName}" successfully!`);
+            window.location.href = "enrollments.html";
+        } catch (e) {
+            alert("Failed to enroll: " + e.message);
+        }
+    }
+</script>
+</body>
+</html>

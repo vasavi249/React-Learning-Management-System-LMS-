@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-graduation-cap"></i> LMS <span>Academy</span>
+        </div>
+        <ul>
+            <!-- Populated dynamically by script.js -->
+        </ul>
+    </nav>
+</header>
+
+<div class="container">
+    <h1 id="welcomeTitle">Student Dashboard</h1>
+
+    <div class="dashboard-grid">
+        <div class="db-card">
+            <div class="db-card-icon"><i class="fa-solid fa-book-open-reader"></i></div>
+            <h2 id="totalCourses">0</h2>
+            <p>Total Courses</p>
+        </div>
+        <div class="db-card">
+            <div class="db-card-icon" style="color: var(--primary);"><i class="fa-solid fa-graduation-cap"></i></div>
+            <h2 id="activeCourses">0</h2>
+            <p>Active Courses</p>
+        </div>
+        <div class="db-card">
+            <div class="db-card-icon" style="color: var(--success);"><i class="fa-solid fa-circle-check"></i></div>
+            <h2 id="completedCourses">0</h2>
+            <p>Completed Courses</p>
+        </div>
+        <div class="db-card">
+            <div class="db-card-icon" style="color: var(--warning);"><i class="fa-solid fa-file-invoice"></i></div>
+            <h2 id="totalAssignments">0</h2>
+            <p>Assignments</p>
+        </div>
+    </div>
+
+    <!-- Overall Progress Section (Bonus) -->
+    <div class="progress-section">
+        <h2>Overall Completion Progress</h2>
+        <div class="progress-container">
+            <div class="progress-fill" id="overallProgressBar" style="width: 0%;">
+                0%
+            </div>
+        </div>
+        <p style="margin-top: 15px; font-size: 14px; color: var(--text-muted);" id="progressSubtext">
+            Enroll in courses and submit assignments to increase your progress.
+        </p>
+    </div>
+    
+    <!-- Quick Shortcuts Card -->
+    <div style="background:var(--bg-card); border-radius:var(--radius-md); padding:30px; box-shadow:var(--shadow-md); border:1px solid var(--border-color); margin-top:30px;">
+        <h3 style="margin-bottom:15px; color:var(--secondary); font-size:18px;">Quick Shortcuts</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:15px;">
+            <a href="courses.html"><button class="btn-add"><i class="fa-solid fa-plus"></i> Browse More Courses</button></a>
+            <a href="enrollments.html"><button class="btn-secondary"><i class="fa-solid fa-list-check"></i> Manage Enrollments</button></a>
+            <a href="assignments.html"><button class="btn-secondary"><i class="fa-solid fa-upload"></i> Submit Assignments</button></a>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 Learning Management System. All Rights Reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    const user = getLoggedInUser();
+
+    document.addEventListener("DOMContentLoaded", () => {
+        if (!user) {
+            alert("Please login first to access the student dashboard.");
+            window.location.href = "login.html";
+            return;
+        }
+
+        document.getElementById("welcomeTitle").innerText = `Welcome, ${user.full_name}`;
+        loadDashboardData();
+    });
+
+    async function loadDashboardData() {
+        try {
+            // Retrieve data
+            const [enrollments, assignments] = await Promise.all([
+                apiCall("/enrollments/"),
+                apiCall("/assignments/")
+            ]);
+
+            // Filter for current user
+            const studentEnrollments = enrollments.filter(e => e.student_name.toLowerCase() === user.full_name.toLowerCase());
+            const studentAssignments = assignments.filter(a => a.student_name.toLowerCase() === user.full_name.toLowerCase());
+
+            // Count metrics
+            const total = studentEnrollments.length;
+            const active = studentEnrollments.filter(e => e.course_status === "Active").length;
+            const completed = studentEnrollments.filter(e => e.course_status === "Completed").length;
+            const asmCount = studentAssignments.length;
+
+            document.getElementById("totalCourses").innerText = total;
+            document.getElementById("activeCourses").innerText = active;
+            document.getElementById("completedCourses").innerText = completed;
+            document.getElementById("totalAssignments").innerText = asmCount;
+
+            // Calculate progress percentage
+            let progressPercent = 0;
+            if (asmCount > 0) {
+                const finishedAsm = studentAssignments.filter(a => a.status === "Submitted" || a.status === "Evaluated").length;
+                progressPercent = Math.round((finishedAsm / asmCount) * 100);
+                
+                document.getElementById("progressSubtext").innerHTML = `
+                    You have submitted or completed <b>${finishedAsm}</b> out of <b>${asmCount}</b> assignments.
+                `;
+            } else if (total > 0) {
+                progressPercent = Math.round((completed / total) * 100);
+                document.getElementById("progressSubtext").innerHTML = `
+                    You have completed <b>${completed}</b> out of <b>${total}</b> enrolled courses.
+                `;
+            } else {
+                progressPercent = 0;
+                document.getElementById("progressSubtext").innerText = "You are not enrolled in any courses yet.";
+            }
+
+            // Update Progress Bar UI
+            const progressBar = document.getElementById("overallProgressBar");
+            progressBar.style.width = `${progressPercent}%`;
+            progressBar.innerText = `${progressPercent}%`;
+
+            if (progressPercent === 100) {
+                progressBar.style.background = "var(--success)";
+            }
+
+        } catch (e) {
+            console.error("Dashboard error", e);
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courses Catalog</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-graduation-cap"></i> LMS <span>Academy</span>
+        </div>
+        <ul>
+            <!-- Populated dynamically by script.js -->
+        </ul>
+    </nav>
+</header>
+
+<div class="container">
+    <h1>Available Courses</h1>
+    
+    <!-- Search & Filter Controls -->
+    <div class="search-filter-section">
+        <input type="text" id="searchInput" placeholder="Search by course name or instructor..." oninput="filterCourses()">
+        
+        <select id="categoryFilter" onchange="filterCourses()">
+            <option value="">All Categories</option>
+            <!-- Categories populated dynamically -->
+        </select>
+        
+        <select id="levelFilter" onchange="filterCourses()">
+            <option value="">All Levels</option>
+            <option value="Beginner">Beginner</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced</option>
+        </select>
+    </div>
+
+    <div class="course-grid" id="coursesGrid">
+        <div style="width:100%; text-align:center; padding:40px; grid-column:1/-1;">
+            <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: var(--primary);"></i>
+            <p style="margin-top:15px; color: var(--text-muted);">Fetching course listings...</p>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 Learning Management System. All Rights Reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    let allCourses = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        await loadCourses();
+    });
+
+    async function loadCourses() {
+        const grid = document.getElementById("coursesGrid");
+        try {
+            allCourses = await apiCall("/courses/");
+            populateCategories(allCourses);
+            renderCourses(allCourses);
+        } catch (e) {
+            grid.innerHTML = `
+                <div style="grid-column: 1/-1; text-align:center; color: var(--danger); padding:40px;">
+                    <i class="fa-solid fa-triangle-exclamation fa-2xl"></i>
+                    <p style="margin-top:15px;">Failed to load courses. Please make sure the Django backend is running.</p>
+                </div>
+            `;
+        }
+    }
+
+    function populateCategories(courses) {
+        const select = document.getElementById("categoryFilter");
+        const categories = [...new Set(courses.map(c => c.category))].filter(Boolean);
+        categories.forEach(cat => {
+            const opt = document.createElement("option");
+            opt.value = cat;
+            opt.textContent = cat;
+            select.appendChild(opt);
+        });
+    }
+
+    function renderCourses(courses) {
+        const grid = document.getElementById("coursesGrid");
+        grid.innerHTML = "";
+
+        if (courses.length === 0) {
+            grid.innerHTML = `
+                <div style="grid-column:1/-1; text-align:center; padding: 40px; color: var(--text-muted);">
+                    <i class="fa-regular fa-folder-open fa-2xl"></i>
+                    <p style="margin-top: 15px;">No courses match the criteria.</p>
+                </div>`;
+            return;
+        }
+
+        courses.forEach(course => {
+            const card = document.createElement("div");
+            card.className = "course-card";
+            
+            let badgeClass = "badge-beginner";
+            if (course.level === "Intermediate") badgeClass = "badge-intermediate";
+            else if (course.level === "Advanced") badgeClass = "badge-advanced";
+
+            card.innerHTML = `
+                <div class="course-card-body">
+                    <span class="course-badge ${badgeClass}">${course.level}</span>
+                    <h2>${course.course_name}</h2>
+                    <div class="course-info"><i class="fa fa-user-tie"></i> <b>Instructor:</b> ${course.instructor_name}</div>
+                    <div class="course-info"><i class="fa-regular fa-clock"></i> <b>Duration:</b> ${course.duration}</div>
+                    <div class="course-info"><i class="fa-solid fa-layer-group"></i> <b>Category:</b> ${course.category}</div>
+                    <div class="course-price">₹${course.price.toLocaleString()}</div>
+                    <button type="button" onclick="enroll('${course.course_name.replace(/'/g, "\\'")}'); event.preventDefault();"><i class="fa-solid fa-plus"></i> Enroll Now</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    function filterCourses() {
+        const searchVal = document.getElementById("searchInput").value.toLowerCase().trim();
+        const catVal = document.getElementById("categoryFilter").value;
+        const levelVal = document.getElementById("levelFilter").value;
+
+        const filtered = allCourses.filter(course => {
+            const matchesSearch = course.course_name.toLowerCase().includes(searchVal) || 
+                                  course.instructor_name.toLowerCase().includes(searchVal);
+            const matchesCategory = catVal === "" || course.category === catVal;
+            const matchesLevel = levelVal === "" || course.level === levelVal;
+            return matchesSearch && matchesCategory && matchesLevel;
+        });
+
+        renderCourses(filtered);
+    }
+
+    async function enroll(courseName) {
+        const user = getLoggedInUser();
+        if (!user) {
+            alert("Please login first to enroll in courses!");
+            window.location.href = "login.html";
+            return;
+        }
+
+        try {
+            // Fetch existing enrollments
+            const enrollments = await apiCall("/enrollments/");
+            const alreadyEnrolled = enrollments.some(e => e.student_name.toLowerCase() === user.full_name.toLowerCase() && e.course_name.toLowerCase() === courseName.toLowerCase());
+            if (alreadyEnrolled) {
+                alert(`You are already enrolled in "${courseName}"! Check My Enrollments.`);
+                window.location.href = "enrollments.html";
+                return;
+            }
+
+            // Create new enrollment object
+            const enrollId = 400 + Math.floor(Math.random() * 10000);
+            const dateToday = new Date().toISOString().split('T')[0];
+            const payload = {
+                enrollment_id: enrollId,
+                student_name: user.full_name,
+                course_name: courseName,
+                enrollment_date: dateToday,
+                payment_status: "Paid",
+                course_status: "Active"
+            };
+
+            await apiCall("/enrollments/add/", "POST", payload);
+
+            // Seed default assignments for the newly enrolled course in database
+            const defaultAssignmentsMap = {
+                "Python Full Stack": ["Student Management System", "Django REST APIs Blog API", "Algorithm Complexity and Data Structures"],
+                "Java Full Stack": ["Library Management System", "Spring Boot MVC Shopping Cart", "Multithreading & Concurrency"],
+                "Data Science": ["Pandas Data Analytics Report", "Customer Churn Prediction Model"],
+                "Django Development": ["E-learning Platform Database Design", "Django Forms & Custom Validation"],
+                "React Frontend Development": ["Single Page Application Dashboard", "React Router & Hooks Practice"]
+            };
+
+            const titles = defaultAssignmentsMap[courseName] || [`Introductory Exercise for ${courseName}`];
+            for (const title of titles) {
+                const asmId = 500 + Math.floor(Math.random() * 10000);
+                const asmPayload = {
+                    assignment_id: asmId,
+                    course_name: courseName,
+                    student_name: user.full_name,
+                    assignment_title: title,
+                    submission_date: null,
+                    marks: null,
+                    status: "Pending"
+                };
+                await apiCall("/assignments/add/", "POST", asmPayload).catch(console.error);
+            }
+
+            alert("Successfully Enrolled in " + courseName + ". Assignments created!");
+            window.location.href = "enrollments.html";
+        } catch (e) {
+            alert("Failed to enroll: " + e.message);
+        }
+    }
+</script>
+</body>
+</html>

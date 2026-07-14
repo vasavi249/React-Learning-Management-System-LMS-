@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Login</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-graduation-cap"></i> LMS <span>Academy</span>
+        </div>
+        <ul>
+            <!-- Populated dynamically by script.js -->
+        </ul>
+    </nav>
+</header>
+
+<div class="container">
+    <div class="form-container">
+        <h2>Student Login</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="e.g. rahul@gmail.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
+        </form>
+        <p>Don't have an account? <a href="register.html">Register here</a></p>
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 Learning Management System. All Rights Reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    document.getElementById("loginForm").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById("email").value.trim().toLowerCase();
+        const password = document.getElementById("password").value;
+
+        if (email === "" || password === "") {
+            alert("Please fill in all fields.");
+            return;
+        }
+
+        try {
+            // Retrieve all student records from database
+            const studentsList = await apiCall("/students/");
+            
+            // Find student matching email and password
+            const matchedStudent = studentsList.find(
+                s => s.email.toLowerCase() === email && s.password === password
+            );
+
+            if (matchedStudent) {
+                // Store student details in localStorage to persist login state
+                setLoggedInUser(matchedStudent);
+                alert("Login Successful! Welcome, " + matchedStudent.full_name);
+                window.location.href = "dashboard.html";
+            } else {
+                alert("Invalid email or password. Please try again.");
+            }
+        } catch (error) {
+            alert("Login failed: " + error.message);
+        }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Enrollments</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-graduation-cap"></i> LMS <span>Academy</span>
+        </div>
+        <ul>
+            <!-- Populated dynamically by script.js -->
+        </ul>
+    </nav>
+</header>
+
+<div class="container">
+    <h1>My Enrollments</h1>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Enrollment ID</th>
+                    <th>Course Name</th>
+                    <th>Date Enrolled</th>
+                    <th>Payment Status</th>
+                    <th>Course Status</th>
+                    <th>Course Progress</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="enrollmentsTableBody">
+                <tr>
+                    <td colspan="7" style="text-align:center; padding:30px; color: var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin fa-xl"></i> Loading enrollments...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Certificate Modal -->
+<div id="certificateModal" class="modal">
+    <div class="modal-content" style="max-width:800px;">
+        <div class="modal-header">
+            <h3>Course Certificate</h3>
+            <button class="modal-close" onclick="closeCertificate()">&times;</button>
+        </div>
+        <div class="modal-body" id="printArea">
+            <div class="certificate-preview" id="certPreview">
+                <h1>Certificate of Completion</h1>
+                <p>This is proudly presented to</p>
+                <div class="cert-name" id="certStudentName">Student Name</div>
+                <p>for successfully completing the course</p>
+                <div class="cert-course" id="certCourseName">Course Title</div>
+                <p>with outstanding dedication and performance.</p>
+                <br>
+                <div style="display:flex; justify-content:space-between; margin-top:30px; padding:0 40px;">
+                    <div>
+                        <p style="border-bottom:1px solid #78350f; font-weight:bold; width:150px; margin:0 auto; padding-bottom:5px;">Saran Velmurugan</p>
+                        <p style="font-size:12px; color:var(--text-muted); font-style:italic;">Lead Instructor</p>
+                    </div>
+                    <div>
+                        <p style="border-bottom:1px solid #78350f; font-weight:bold; width:150px; margin:0 auto; padding-bottom:5px;" id="certDate">Date</p>
+                        <p style="font-size:12px; color:var(--text-muted); font-style:italic;">Issue Date</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeCertificate()">Cancel</button>
+            <button class="btn-action btn-certificate" onclick="printCertificate()"><i class="fa-solid fa-print"></i> Print / Save PDF</button>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 Learning Management System. All Rights Reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    const user = getLoggedInUser();
+
+    document.addEventListener("DOMContentLoaded", () => {
+        if (!user) {
+            alert("Please login to view your enrollments.");
+            window.location.href = "login.html";
+            return;
+        }
+        loadEnrollments();
+    });
+
+    async function loadEnrollments() {
+        const tbody = document.getElementById("enrollmentsTableBody");
+        try {
+            // Retrieve all enrollments and assignments from database
+            const [enrollments, assignments] = await Promise.all([
+                apiCall("/enrollments/"),
+                apiCall("/assignments/")
+            ]);
+
+            // Filter enrollments relating to this student
+            const studentEnrollments = enrollments.filter(e => e.student_name.toLowerCase() === user.full_name.toLowerCase());
+            tbody.innerHTML = "";
+
+            if (studentEnrollments.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:40px; color: var(--text-muted);">
+                            <i class="fa-regular fa-calendar-xmark fa-2xl"></i>
+                            <p style="margin-top:15px;">You have not enrolled in any courses yet.</p>
+                            <br>
+                            <a href="courses.html"><button class="btn-add">Explore Courses</button></a>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            studentEnrollments.forEach(enroll => {
+                // Calculate completion progress dynamically based on assignments
+                const courseAssignments = assignments.filter(
+                    a => a.course_name.toLowerCase() === enroll.course_name.toLowerCase() &&
+                         a.student_name.toLowerCase() === user.full_name.toLowerCase()
+                );
+                
+                // Completed = Evaluated or Submitted
+                const completedCount = courseAssignments.filter(a => a.status === "Evaluated" || a.status === "Submitted").length;
+                let progressPercent = 0;
+                
+                if (courseAssignments.length > 0) {
+                    progressPercent = Math.round((completedCount / courseAssignments.length) * 100);
+                } else if (enroll.course_status === "Completed") {
+                    progressPercent = 100;
+                } else if (enroll.course_status === "Cancelled") {
+                    progressPercent = 0;
+                } else {
+                    progressPercent = 30; // default initial progress for active enrollments
+                }
+
+                // If progress reaches 100%, and status is Active, auto-update course status in backend to Completed
+                if (progressPercent === 100 && enroll.course_status !== "Completed" && enroll.course_status !== "Cancelled") {
+                    enroll.course_status = "Completed";
+                    apiCall(`/enrollments/update/${enroll.id || enroll.enrollment_id}/`, "PUT", enroll).catch(console.error);
+                }
+
+                let statusBadge = "badge-pending";
+                if (enroll.course_status === "Active") statusBadge = "badge-active";
+                else if (enroll.course_status === "Completed") statusBadge = "badge-completed";
+                else if (enroll.course_status === "Cancelled") statusBadge = "badge-cancelled";
+
+                let payBadge = enroll.payment_status === "Paid" ? "badge-paid" : "badge-pending";
+
+                // Generate certificate button only on completion
+                let actionBtn = "";
+                if (progressPercent === 100 || enroll.course_status === "Completed") {
+                    actionBtn = `<button class="btn-action btn-certificate" onclick="downloadCertificate('${enroll.course_name.replace(/'/g, "\\'")}', '${enroll.enrollment_date}')"><i class="fa-solid fa-award"></i> Certificate</button>`;
+                } else {
+                    actionBtn = `<span style="font-size:12px; color:var(--text-muted);">In Progress</span>`;
+                }
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td><b>#${enroll.enrollment_id}</b></td>
+                    <td>${enroll.course_name}</td>
+                    <td>${enroll.enrollment_date}</td>
+                    <td><span class="badge ${payBadge}">${enroll.payment_status}</span></td>
+                    <td><span class="badge ${statusBadge}">${enroll.course_status}</span></td>
+                    <td>
+                        <div class="progress">
+                            <div class="progress-bar" style="width: ${progressPercent}%; height: 18px; line-height: 18px; text-align: center; color: white; font-size:11px; font-weight:bold; background: ${progressPercent === 100 ? 'var(--success)' : 'var(--primary)'}; border-radius:10px;">
+                                ${progressPercent}%
+                            </div>
+                        </div>
+                    </td>
+                    <td>${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+        } catch (e) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align:center; color: var(--danger); padding:30px;">
+                        <i class="fa-solid fa-circle-exclamation fa-xl"></i> Error fetching enrollments.
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function downloadCertificate(courseName, dateStr) {
+        document.getElementById("certStudentName").innerText = user.full_name;
+        document.getElementById("certCourseName").innerText = courseName;
+        
+        // Format date beautifully
+        try {
+            const dateObj = new Date(dateStr);
+            document.getElementById("certDate").innerText = dateObj.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        } catch (e) {
+            document.getElementById("certDate").innerText = dateStr;
+        }
+
+        document.getElementById("certificateModal").style.display = "flex";
+    }
+
+    function closeCertificate() {
+        document.getElementById("certificateModal").style.display = "none";
+    }
+
+    function printCertificate() {
+        const printContent = document.getElementById("printArea").innerHTML;
+        const originalContent = document.body.innerHTML;
+        
+        // Open print window styled with certificate
+        const win = window.open("", "_blank");
+        win.document.write(`
+            <html>
+            <head>
+                <title>LMS Academy Course Certificate</title>
+                <style>
+                    body { margin: 0; padding: 20px; font-family: 'Georgia', serif; }
+                    .certificate-preview {
+                        border: 15px double #b45309;
+                        padding: 60px 40px;
+                        text-align: center;
+                        background: #fcfbf7;
+                        max-width: 800px;
+                        margin: 20px auto;
+                    }
+                    h1 { font-size: 40px; color: #78350f; font-weight: normal; margin-bottom: 20px; text-transform: uppercase; }
+                    p { font-size: 18px; color: #4b5563; margin-bottom: 15px; }
+                    .cert-name { font-size: 34px; font-weight: bold; color: #1e293b; margin: 30px 0; text-decoration: underline; }
+                    .cert-course { font-size: 26px; font-weight: bold; color: #4338ca; margin-bottom: 30px; }
+                </style>
+            </head>
+            <body onload="window.print(); window.close();">
+                ${printContent}
+            </body>
+            </html>
+        `);
+        win.document.close();
+    }
+</script>
+</body>
+</html>

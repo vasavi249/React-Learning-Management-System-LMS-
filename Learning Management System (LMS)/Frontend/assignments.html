@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Assignments</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-graduation-cap"></i> LMS <span>Academy</span>
+        </div>
+        <ul>
+            <!-- Populated dynamically by script.js -->
+        </ul>
+    </nav>
+</header>
+
+<div class="container">
+    <h1>My Assignments</h1>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Assignment ID</th>
+                    <th>Course Name</th>
+                    <th>Assignment Title</th>
+                    <th>Date Submitted</th>
+                    <th>Marks</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="assignmentsTableBody">
+                <tr>
+                    <td colspan="7" style="text-align:center; padding:30px; color: var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin fa-xl"></i> Loading assignments...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 Learning Management System. All Rights Reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    const user = getLoggedInUser();
+
+    document.addEventListener("DOMContentLoaded", () => {
+        if (!user) {
+            alert("Please login first to view your assignments.");
+            window.location.href = "login.html";
+            return;
+        }
+        loadAssignments();
+    });
+
+    async function loadAssignments() {
+        const tbody = document.getElementById("assignmentsTableBody");
+        try {
+            // Fetch assignments and enrollments
+            const [allAssignments, allEnrollments] = await Promise.all([
+                apiCall("/assignments/"),
+                apiCall("/enrollments/")
+            ]);
+
+            // Enrollments for this student
+            const studentEnrollments = allEnrollments.filter(
+                e => e.student_name.toLowerCase() === user.full_name.toLowerCase()
+            );
+
+            // Filter assignments that are associated with the logged in student
+            let studentAssignments = allAssignments.filter(
+                a => a.student_name.toLowerCase() === user.full_name.toLowerCase()
+            );
+
+            // Self-healing: Check if student has enrolled courses with zero assignments
+            let missingSeeded = false;
+            const defaultAssignmentsMap = {
+                "Python Full Stack": ["Student Management System", "Django REST APIs Blog API", "Algorithm Complexity and Data Structures"],
+                "Java Full Stack": ["Library Management System", "Spring Boot MVC Shopping Cart", "Multithreading & Concurrency"],
+                "Data Science": ["Pandas Data Analytics Report", "Customer Churn Prediction Model"],
+                "Django Development": ["E-learning Platform Database Design", "Django Forms & Custom Validation"],
+                "React Frontend Development": ["Single Page Application Dashboard", "React Router & Hooks Practice"]
+            };
+
+            for (const enroll of studentEnrollments) {
+                const courseAsms = studentAssignments.filter(
+                    a => a.course_name.toLowerCase() === enroll.course_name.toLowerCase()
+                );
+                if (courseAsms.length === 0) {
+                    const titles = defaultAssignmentsMap[enroll.course_name] || [`Introductory Exercise for ${enroll.course_name}`];
+                    for (const title of titles) {
+                        const asmId = 500 + Math.floor(Math.random() * 10000);
+                        const asmPayload = {
+                            assignment_id: asmId,
+                            course_name: enroll.course_name,
+                            student_name: user.full_name,
+                            assignment_title: title,
+                            submission_date: null,
+                            marks: null,
+                            status: "Pending"
+                        };
+                        await apiCall("/assignments/add/", "POST", asmPayload).catch(console.error);
+                    }
+                    missingSeeded = true;
+                }
+            }
+
+            // Re-fetch assignments if we seeded missing ones
+            if (missingSeeded) {
+                const updatedAssignments = await apiCall("/assignments/");
+                studentAssignments = updatedAssignments.filter(
+                    a => a.student_name.toLowerCase() === user.full_name.toLowerCase()
+                );
+            }
+
+            tbody.innerHTML = "";
+
+            if (studentAssignments.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:40px; color: var(--text-muted);">
+                            <i class="fa-regular fa-clipboard fa-2xl"></i>
+                            <p style="margin-top: 15px;">No assignments registered for you.</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            studentAssignments.forEach(asm => {
+                let statusBadge = "badge-pending";
+                if (asm.status === "Submitted") statusBadge = "badge-submitted";
+                else if (asm.status === "Evaluated") statusBadge = "badge-evaluated";
+
+                let marksDisplay = asm.marks !== null && asm.marks !== undefined ? `${asm.marks} / 100` : "-";
+                let dateDisplay = asm.submission_date ? asm.submission_date : "-";
+
+                // Action button: active only if Pending
+                let actionBtn = "";
+                if (asm.status === "Pending") {
+                    actionBtn = `
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                            <input type="file" id="file_${asm.id || asm.assignment_id}" style="font-size:11px; max-width:150px; color:var(--text-muted);">
+                            <button type="button" class="btn-action btn-action-submit" onclick="submitAsm(${asm.id || asm.assignment_id}); event.preventDefault();"><i class="fa-solid fa-cloud-arrow-up"></i> Submit</button>
+                        </div>
+                    `;
+                } else if (asm.status === "Submitted") {
+                    actionBtn = `<span style="font-size:13px; color: var(--text-muted);"><i class="fa-solid fa-hourglass-half"></i> Under Review</span>`;
+                } else {
+                    actionBtn = `<span style="font-size:13px; color: var(--success);"><i class="fa-solid fa-circle-check"></i> Graded</span>`;
+                }
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td><b>#${asm.assignment_id}</b></td>
+                    <td>${asm.course_name}</td>
+                    <td>${asm.assignment_title}</td>
+                    <td>${dateDisplay}</td>
+                    <td><b>${marksDisplay}</b></td>
+                    <td><span class="badge ${statusBadge}">${asm.status}</span></td>
+                    <td>${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align:center; color: var(--danger); padding:30px;">
+                        <i class="fa-solid fa-circle-exclamation fa-xl"></i> Error loading assignments.
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    async function submitAsm(assignmentId) {
+        console.log("Submit clicked for assignment ID:", assignmentId);
+        
+        // Find the file input element and verify a file is chosen
+        const fileInput = document.getElementById(`file_${assignmentId}`);
+        if (fileInput && fileInput.files.length === 0) {
+            alert("Please choose a file to upload first!");
+            return;
+        }
+        
+        const fileName = fileInput.files[0].name;
+        console.log(`Submitting assignment with file: ${fileName}`);
+
+        try {
+            const allAsms = await apiCall("/assignments/");
+            console.log("Fetched all assignments:", allAsms);
+            const currentAsm = allAsms.find(a => (a.id == assignmentId || a.assignment_id == assignmentId));
+            if (!currentAsm) {
+                console.error("Assignment not found for ID:", assignmentId);
+                alert("Assignment record not found.");
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            const updatedAsm = {
+                ...currentAsm,
+                submission_date: today,
+                status: "Submitted"
+            };
+
+            const pk = currentAsm.id || currentAsm.assignment_id;
+            console.log("Sending PUT request to update assignment pk:", pk, "with payload:", updatedAsm);
+            await apiCall(`/assignments/update/${pk}/`, "PUT", updatedAsm);
+            alert(`Assignment files successfully uploaded and submitted!`);
+            loadAssignments();
+        } catch (e) {
+            console.error("Submission error:", e);
+            alert("Submission failed: " + e.message);
+        }
+    }
+</script>
+</body>
+</html>
