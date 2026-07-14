@@ -1,8 +1,10 @@
-// Replace this with your actual deployed Django server URL
-const API_BASE = "https://your-backend-api-domain.com";
-CORS_ALLOWED_ORIGINS = [
-    "https://your-frontend-website-domain.com",
-]
+// Set this to your deployed Django backend server URL (e.g. https://lms-api.onrender.com)
+const DEPLOYED_BACKEND_URL = "https://your-backend-api-domain.com";
+
+// Smart endpoint resolution: uses local server for file:// and localhost testing, falls back to live URL otherwise.
+const API_BASE = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" || window.location.protocol === "file:")
+    ? "http://127.0.0.1:8000"
+    : DEPLOYED_BACKEND_URL;
 
 // Standard helper to handle API calls using Fetch
 async function apiCall(endpoint, method = "GET", data = null) {
