@@ -1,6 +1,0 @@
-{
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/:path*", "destination": "/Learning Management System (LMS)/Frontend/:path*" }
-  ]
-}
