@@ -1,9 +1,14 @@
 // Set this to your deployed Django backend server URL (e.g. https://lms-api.onrender.com)
 const DEPLOYED_BACKEND_URL = "https://your-backend-api-domain.com";
 
-// Smart endpoint resolution: uses local server for file:// and localhost testing, falls back to live URL otherwise.
-const API_BASE = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" || window.location.protocol === "file:")
-    ? "http://127.0.0.1:8000"
+// Checks if loaded locally or on local network (127.x.x.x, localhost, or private IP ranges)
+const host = window.location.hostname;
+const isLocalNetwork = host === "localhost" || host === "127.0.0.1" || 
+                       host.startsWith("192.168.") || host.startsWith("10.") || 
+                       host.startsWith("172.") || window.location.protocol === "file:";
+
+const API_BASE = isLocalNetwork
+    ? `http://${(host === "" || window.location.protocol === "file:") ? "127.0.0.1" : host}:8000`
     : DEPLOYED_BACKEND_URL;
 
 // Standard helper to handle API calls using Fetch
