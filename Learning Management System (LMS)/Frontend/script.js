@@ -1,5 +1,5 @@
 // Set this to your local server link or IP address generated in CMD (e.g. http://127.0.0.1:8000 or http://192.168.1.15:8000)
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://unreal-unreeling-conduit.ngrok-free.dev";
 
 // Standard helper to handle API calls using Fetch
 async function apiCall(endpoint, method = "GET", data = null) {
