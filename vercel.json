@@ -1,0 +1,7 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/Learning Management System (LMS)/Frontend/index.html" },
+    { "source": "/(.*)", "destination": "/Learning Management System (LMS)/Frontend/$1" }
+  ]
+}
